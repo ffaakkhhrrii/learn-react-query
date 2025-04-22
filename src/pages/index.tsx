@@ -1,115 +1,154 @@
+/* eslint-disable @next/next/no-img-element */
+import { useMutation, useQuery } from "@tanstack/react-query";
 import Image from "next/image";
-import { Geist, Geist_Mono } from "next/font/google";
+import { FormEvent, useEffect, useState } from "react";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+interface Product {
+  id: string,
+  title: string,
+  image: string
+}
 
 export default function Home() {
+  const [fetchData, setFetchData] = useState(false);
+  const [showSuccess, setShowSuccess] = useState<string | null>(null);
+  const [showAddProduct, setShowAddProduct] = useState(false);
+  const [showDetail, setShowDetail] = useState<string | null>(null);
+  const { isLoading, isError, error, data, isSuccess } = useQuery({
+    queryKey: ["products"],
+    queryFn: async () => {
+      const res = await fetch("https://fakestoreapi.com/products");
+      return res.json();
+    },
+    enabled: fetchData
+  });
+
+  const { data: dataProductDetail } = useQuery({
+    queryKey: ["product", showDetail], // param kedua berfungsi agar ketika datanya berubah dia akan melakukan hit ulang
+    queryFn: async () => {
+      const res = await fetch(`https://fakestoreapi.com/products/${showDetail}`);
+      return res.json();
+    },
+    enabled: showDetail !== null
+  });
+
+  const {mutate, isPending: isPendingAddProduct} = useMutation({
+    mutationFn: async (formData: FormData)=>{
+      return await fetch('https://fakestoreapi.com/products',{
+        method: 'POST',
+        body: formData
+      })
+    },
+    onSuccess: ()=>{
+      setShowAddProduct(false);
+      setShowSuccess("Success Add Data");
+      setTimeout(() => {
+        setShowSuccess(null);
+      }, 2000)
+    }
+  })
+
+  const onSubmitProduct = (e: FormEvent)=>{
+    e.preventDefault();
+    mutate(new FormData(e.target as HTMLFormElement));
+  }
+
+  useEffect(() => {
+    if (isSuccess) {
+      setShowSuccess("Success Fetch Data");
+      setTimeout(() => {
+        setShowSuccess(null);
+      }, 2000)
+    }
+  }, [isSuccess]);
+
+  console.log(dataProductDetail);
   return (
-    <div
-      className={`${geistSans.className} ${geistMono.className} grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]`}
-    >
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/pages/index.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <div className="container mx-auto m-4">
+      {
+        !fetchData && (
+          <button onClick={() => setFetchData(true)} className="bg-blue-600 text-white rounded-lg px-3 py-2 cursor-pointer">Show Data</button>
+        )
+      }
+      {
+        showSuccess != null && (
+          <div className="bg-green-300 p-4 rounded-lg animate-bounce">{showSuccess}</div>
+        )
+      }
+      {
+        isLoading ? (
+          <h2 className="text-center font-bold text-lg">Loading....</h2>
+        ) : (
+          isError ? (
+            <h2 className="text-center text-red-600 font-bold text-lg">{error.message}</h2>
+          ) : <>
+            <div className="mt-2">
+              <button onClick={() => setShowAddProduct(true)} className="bg-blue-600 text-white rounded-lg px-3 py-2 cursor-pointer">Add Data</button>
+              <div className={`fixed h-screen w-screen top-0 left-0 bg-black/50 ${showAddProduct ? 'flex justify-center items-center z-50' : 'hidden'
+                }`}>
+                <div className="relative w-1/2 bg-white flex items-center gap-8 p-8">
+                  <button className="absolute top-5 right-5 cursor-pointer" onClick={() => setShowAddProduct(false)}>X</button>
+                  <form className="w-full space-y-1" onSubmit={onSubmitProduct}>
+                    <label htmlFor="id" className="flex flex-col">
+                      ID:
+                      <input type="number" id="id" name="id" className="w-full p-2 border-2" />
+                    </label>
+                    <label className="flex flex-col" htmlFor="title">
+                      Title:
+                      <input type="text" id="title" name="title" className="w-full p-2 border-2" />
+                    </label>
+                    <label className="flex flex-col" htmlFor="price">
+                      Price:
+                      <input type="number" id="price" name="price" className="w-full p-2 border-2" />
+                    </label>
+                    <label className="flex flex-col" htmlFor="description">
+                      Description:
+                      <textarea id="description" name="description" className="w-full p-2 border-2" />
+                    </label>
+                    <label className="flex flex-col" htmlFor="category">
+                      Category:
+                      <input type="text" id="category" name="category" className="w-full p-2 border-2" />
+                    </label>
+                    <label className="flex flex-col" htmlFor="image">
+                      Image:
+                      <input type="text" id="image" name="image" className="w-full p-2 border-2" />
+                    </label>
+                    <button className="bg-black text-white p-3 text-center w-full mt-2">
+                      {isPendingAddProduct ? 'Loading' : 'Submit'}
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
+                {
+                  data?.map((product: Product) => (
+                    <div onClick={() => setShowDetail(product.id)} key={product.id} className="shadow-xl rounded-xl p-4 flex flex-col items-center">
+                      <Image
+                        className="scale-50 h-40 w-fit"
+                        src={product.image} width={100} alt={product.title} height={100}
+                      />
+                      <h4 className="w-full line-clamp-1 font-bold text-center">{product.title}</h4>
+                    </div>
+                  ))
+                }
+              </div>
+            </div>
+          </>
+        )
+      }
+      <div className={`fixed h-screen w-screen top-0 left-0 bg-black/50 ${showDetail ? 'flex justify-center items-center' : 'hidden'
+        }`}>
+        <div className="relative h-1/2 w-1/2 bg-white flex items-center gap-8 p-8">
+          <button className="absolute top-5 right-5 cursor-pointer" onClick={() => setShowDetail(null)}>X</button>
+          <img src={dataProductDetail?.image} alt={dataProductDetail?.title} className="w-1/4" />
+          <div className="w-3/4 space-y-3">
+            <h1 className="text-xl font-bold line-clamp-1">{dataProductDetail?.title}</h1>
+            <p className="text-base">{dataProductDetail?.description}</p>
+            <p className="font-bold text-xl">${dataProductDetail?.price}</p>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </div>
     </div>
   );
 }
